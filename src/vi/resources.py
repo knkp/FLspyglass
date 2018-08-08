@@ -20,14 +20,26 @@
 import os
 import sys
 
+def changeUnixToWinPath(path):
+    tokens = path.split('/')
+    for x in range(0, len(tokens) - 1):
+        tokens[x] = tokens[x] + '\\'
+    winPath = "".join(tokens)
+    print winPath
+    return winPath
+        
 
 def resourcePath(relativePath):
     """ Get absolute path to resource, works for dev and for PyInstaller
     """
+    returnpath = ''
     if getattr(sys, 'frozen', False):
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         basePath = sys._MEIPASS
     else:
         basePath = os.path.abspath(".")
-    returnpath = os.path.join(basePath, relativePath)
+    if sys.platform.startswith("win32"):
+        returnpath = os.path.join(basePath, changeUnixToWinPath(relativePath))
+    else:
+        returnpath = os.path.join(basePath, changeUnixToWinPath(relativePath))
     return returnpath

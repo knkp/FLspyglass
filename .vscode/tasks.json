@@ -1,0 +1,44 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build SpyGlass (EXE)",
+            "type": "process",
+            "command": "pyinstaller",
+            "args": [
+                "--specpath",
+                "${workspaceFolder}/build-exe",
+                "--onefile",
+                "${workspaceFolder}/src/spyglass-file-release.spec",
+                "-y"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true
+            }
+        },
+        {
+            "label": "Build SpyGlass (Folder)",
+            "type": "process",
+            "command": "pyinstaller",
+            "args": [
+                "--specpath",
+                "${workspaceFolder}/build-folder",
+                "${workspaceFolder}/src/spyglass-folder-release.spec",
+                "-y"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true
+            }
+        }
+    ]
+}

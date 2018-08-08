@@ -34,6 +34,15 @@ from vi.resources import resourcePath
 from vi.cache.cache import Cache
 from PyQt4.QtGui import QApplication, QMessageBox
 
+# Have to add these lines to get PyInstaller 3.3.1 to work correctly, apparently there is still an open bug for this issue:
+# Which can be referenced, along with this fix, here: https://github.com/pyinstaller/pyinstaller/issues/1803
+#sys.modules['win32com.gen_py.os'] = None
+#sys.modules['win32com.gen_py.pywintypes'] = None
+#sys.modules['win32com.gen_py.pythoncom'] = None
+#
+# ^^ leaving this for reference for now, it didn't work but it was the closest thing that I tried besides the
+# vbs hack
+
 
 def exceptHook(exceptionType, exceptionValue, tracebackObject):
     """
@@ -74,11 +83,16 @@ class Application(QApplication):
             elif sys.platform.startswith("linux"):
                 chatLogDirectory = os.path.join(os.path.expanduser("~"), "EVE", "logs", "Chatlogs")
             elif sys.platform.startswith("win32") or sys.platform.startswith("cygwin"):
-                import ctypes.wintypes
-                buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
-                ctypes.windll.shell32.SHGetFolderPathW(0, 5, 0, 0, buf)
-                documentsPath = buf.value
-                chatLogDirectory = os.path.join(documentsPath, "EVE", "logs", "Chatlogs")
+                # Removing this segment, debugging it works, but compiled with PyInstaller it fails and 
+                # according to the docs, the same code should work for both linux and windows
+                #import ctypes.wintypes
+                #buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
+                #ctypes.windll.shell32.SHGetFolderPathW(0, 5, 0, 0, buf)
+                #documentsPath = buf.value
+                #chatLogDirectory = os.path.join(documentsPath, "EVE", "logs", "Chatlogs")
+                chatLogDirectory = os.path.join(os.path.expanduser("~"), "Documents", "EVE", "logs", "Chatlogs")
+                #print("documentsPath: " + documentsPath)
+                #print("chatLogDirectory: " + chatLogDirectory)
         if not os.path.exists(chatLogDirectory):
             # None of the paths for logs exist, bailing out
             QMessageBox.critical(None, "No path to Logs", "No logs found at: " + chatLogDirectory, "Quit")

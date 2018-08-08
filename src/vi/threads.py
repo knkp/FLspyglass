@@ -54,6 +54,7 @@ class AvatarFindThread(QThread):
             logging.error("Error in AvatarFindThread: %s", e)
 
     def run(self):
+        print("Running Avatar Find Thread")
         cache = Cache()
         lastCall = 0
         wait = 300  # time between 2 requests in ms
@@ -162,6 +163,7 @@ class MapStatisticsThread(QThread):
         self.queue.put(1)
 
     def run(self):
+        print("Running Map Statistics Thread")
         self.refreshTimer = QTimer()
         self.connect(self.refreshTimer, SIGNAL("timeout()"), self.requestStatistics)
         while True:

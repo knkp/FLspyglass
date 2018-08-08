@@ -199,3 +199,6 @@ def parseUrls(rtext):
         for url in urls:
             textReplace(text, formatUrl(text, url))
             return True
+
+def parseNames(rtext):
+    print 'parseNames to parse: ' + rtext

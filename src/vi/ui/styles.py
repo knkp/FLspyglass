@@ -37,16 +37,16 @@ class Styles:
     def __init__(self):
 
         # default theme
-        with open(resourcePath("vi/ui/res/styles/light.css")) as default:
+        with open(resourcePath("src/vi/ui/res/styles/light.css")) as default:
             Styles.defaultStyle = default.read()
-        with open(resourcePath("vi/ui/res/styles/light.yaml")) as default:
+        with open(resourcePath("src/vi/ui/res/styles/light.yaml")) as default:
             Styles.defaultCommons = yaml.load(default)
         default = None
 
         # dark theme
-        with open(resourcePath("vi/ui/res/styles/abyss.css")) as dark:
+        with open(resourcePath("src/vi/ui/res/styles/abyss.css")) as dark:
             Styles.darkStyle = dark.read()
-        with open(resourcePath("vi/ui/res/styles/abyss.yaml")) as dark:
+        with open(resourcePath("src/vi/ui/res/styles/abyss.yaml")) as dark:
             Styles.darkCommons = yaml.load(dark)
         dark = None
 

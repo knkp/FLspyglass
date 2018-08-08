@@ -24,6 +24,9 @@ import re
 import requests
 import time
 import six
+# let's switch from pyglet to pyaudio to get it to work correctly
+import pyaudio
+import wave
 
 from collections import namedtuple
 from PyQt4.QtCore import QThread
@@ -89,7 +92,7 @@ class SoundManager(six.with_metaclass(Singleton)):
             if self.useSpokenNotifications:
                 audioFile = None
             else:
-                audioFile = resourcePath("vi/ui/res/{0}".format(self.SOUNDS[name]))
+                audioFile = resourcePath("src/vi/ui/res/{0}".format(self.SOUNDS[name]))
             self._soundThread.queue.put((audioFile, message, abbreviatedMessage))
 
     def quit(self):
@@ -112,6 +115,8 @@ class SoundManager(six.with_metaclass(Singleton)):
         def __init__(self):
             QThread.__init__(self)
             self.queue = queue.Queue()
+            self.CHUNK_SIZE = 1024
+            print("the queue: " + str(self.queue))
             if gPygletAvailable:
                 self.player = media.Player()
             else:
@@ -122,9 +127,11 @@ class SoundManager(six.with_metaclass(Singleton)):
             self.volume = volume
 
         def run(self):
+            print("SoundThread is running \n")
             while True:
                 audioFile, message, abbreviatedMessage = self.queue.get()
                 if not self.active:
+                    print("SoundThread: not currently active\n")
                     return
                 if SoundManager().useSpokenNotifications and (message != "" or abbreviatedMessage != ""):
                     if abbreviatedMessage != "":
@@ -133,7 +140,9 @@ class SoundManager(six.with_metaclass(Singleton)):
                         self.playAudioFile(audioFile, False)
                         logging.error("SoundThread: sorry, speech not yet implemented on this platform")
                 elif audioFile is not None:
+                    print("SoundThread: played audioFile" + '\n')
                     self.playAudioFile(audioFile, False)
+                    
 
         def quit(self):
             self.active = False
@@ -158,18 +167,20 @@ class SoundManager(six.with_metaclass(Singleton)):
             self.speakRandomChuckNorrisJoke()
 
         # Audio subsytem access
-
         def playAudioFile(self, filename, stream=False):
             try:
                 volume = float(self.volume) / 100.0
+                print("playAudioFile: volume=" + str(volume) + " , filename=" + filename)
+                print("playAUdioFile: self.player=" + str(self.player))
                 if self.player:
-                    src = media.load(filename, streaming=stream)
-                    self.player.queue(src)
-                    self.player.volume = volume
-                    self.player.play()
+                    print("playAudioFile: entered into self.player if statement")
+                    soundPlayer = resourcePath("src/vi/ui/res/play_wav.cmd")
+                    print('soundplayer script at: ' + soundPlayer)
+                    os.system(soundPlayer + " " + filename)                    
                 elif self.isDarwin:
                     subprocess.call(["afplay -v {0} {1}".format(volume, filename)], shell=True)
             except Exception as e:
+                print("playAudioFile: exception occurred\n")
                 logging.error("SoundThread.playAudioFile exception: %s", e)
 
         def darwinSpeak(self, message):

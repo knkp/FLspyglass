@@ -29,10 +29,11 @@ import threading
 import vi.version
 
 import logging
+from bs4 import BeautifulSoup
 from PyQt4.QtGui import *
 from PyQt4 import QtGui, uic, QtCore
-from PyQt4.QtCore import QPoint, SIGNAL
-from PyQt4.QtGui import QImage, QPixmap, QMessageBox
+from PyQt4.QtCore import QPoint, SIGNAL, QString
+from PyQt4.QtGui import QImage, QPixmap, QMessageBox, QTableWidget, QTableWidgetItem
 from PyQt4.QtWebKit import QWebPage
 from vi import amazon_s3, evegate
 from vi import dotlan, filewatcher
@@ -46,6 +47,7 @@ from vi.ui.styles import Styles
 from vi.chatparser import ChatParser
 from PyQt4.QtGui import QAction
 from PyQt4.QtGui import QMessageBox
+from vi.zkboardgate import zKillBoard
 
 # Timer intervals
 MESSAGE_EXPIRY_SECS = 20 * 60
@@ -61,11 +63,11 @@ class MainWindow(QtGui.QMainWindow):
 
         if backGroundColor:
             self.setStyleSheet("QWidget { background-color: %s; }" % backGroundColor)
-        uic.loadUi(resourcePath('vi/ui/MainWindow.ui'), self)
+        uic.loadUi(resourcePath('src/vi/ui/MainWindow.ui'), self)
         self.setWindowTitle(
             "Spyglass " + vi.version.VERSION + "{dev}".format(dev="-SNAPSHOT" if vi.version.SNAPSHOT else ""))
-        self.taskbarIconQuiescent = QtGui.QIcon(resourcePath("vi/ui/res/logo_small.png"))
-        self.taskbarIconWorking = QtGui.QIcon(resourcePath("vi/ui/res/logo_small_green.png"))
+        self.taskbarIconQuiescent = QtGui.QIcon(resourcePath("src/vi/ui/res/logo_small.png"))
+        self.taskbarIconWorking = QtGui.QIcon(resourcePath("src/vi/ui/res/logo_small_green.png"))
         self.setWindowIcon(self.taskbarIconQuiescent)
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
@@ -238,8 +240,8 @@ class MainWindow(QtGui.QMainWindow):
         self.statisticsThread.start()
         # statisticsThread is blocked until first call of requestStatistics
 
-        self.voiceThread = VoiceOverThread()
-        self.voiceThread.start()
+        #self.voiceThread = VoiceOverThread()
+        #self.voiceThread.start()
 
     def setupMap(self, initialize=False):
         self.mapTimer.stop()
@@ -251,7 +253,7 @@ class MainWindow(QtGui.QMainWindow):
             regionName = "Providence"
         svg = None
         try:
-            with open(resourcePath("vi/ui/res/mapdata/{0}.svg".format(regionName))) as svgFile:
+            with open(resourcePath("src/vi/ui/res/mapdata/{0}.svg".format(regionName))) as svgFile:
                 svg = svgFile.read()
         except Exception as e:
             pass
@@ -402,7 +404,7 @@ class MainWindow(QtGui.QMainWindow):
             self.versionCheckThread.wait()
             self.statisticsThread.quit()
             self.statisticsThread.wait()
-            self.voiceThread.join()
+            #self.voiceThread.join()
         except Exception:
             pass
         self.trayIcon.hide()
@@ -585,9 +587,45 @@ class MainWindow(QtGui.QMainWindow):
         sc.connect(sc, SIGNAL("location_set"), self.setLocation)
         sc.show()
 
-    def markSystemOnMap(self, systemname, timeA=time.time()):
-        self.systems[six.text_type(systemname)].mark(timeA)
-        self.updateMapView()
+    def markSystemOnMapOrzKillBoardCheck(self, name, timeA=time.time()):
+        if name in self.systems:
+            self.systems[six.text_type(name)].mark(timeA)
+            self.updateMapView()
+        else:
+            kb = zKillBoard(name, _Cache=self.cache, _gui_testing = False)
+
+            if kb.api_success == False:
+                QMessageBox.warning(None,"Error Processing Request", "zKillBoard failed to respond, it's possible there have been too many requests")
+                return
+            
+            if kb.user_found == False or kb.got_ships == False:
+                QMessageBox.warning(None, "Error Processing Request", "The user wasn't found by zKillBoard")
+                return
+            
+            self.table 	= QTableWidget()
+            self.tableItem 	= QTableWidgetItem()
+        
+            # initiate table
+            self.table.setWindowTitle("Top Ships for user: " + kb.character_name)
+            self.table.resize(400, kb.ship_count*28 + 42)
+            self.table.setRowCount(kb.ship_count)
+            self.table.setColumnCount(3)
+
+            header = self.table.horizontalHeader()
+            header.setResizeMode(0, QtGui.QHeaderView.Stretch)
+            header.setResizeMode(1, QtGui.QHeaderView.Stretch)
+            header.setResizeMode(2, QtGui.QHeaderView.Stretch)
+        
+            self.table.setHorizontalHeaderLabels(QString("Ship;Kills;Losses").split(";"))
+            # set data
+            for i in range(0, kb.ship_count):
+                ship_name = kb.ship_name_map[kb.ships_unique[i]]
+                kills_occurrences = str(kb.ship_kills_occurence_map[kb.ships_unique[i]])
+                loss_occurrences = str(kb.ship_loss_occurence_map[kb.ships_unique[i]])
+                self.table.setItem(i,0, QTableWidgetItem(ship_name))
+                self.table.setItem(i,1, QTableWidgetItem(kills_occurrences))
+                self.table.setItem(i,2, QTableWidgetItem(loss_occurrences))
+            self.table.show()
 
     def setLocation(self, char, newSystem):
         for system in self.systems.values():
@@ -708,7 +746,7 @@ class MainWindow(QtGui.QMainWindow):
         self.chatListWidget.setItemWidget(listWidgetItem, chatEntryWidget)
         self.avatarFindThread.addChatEntry(chatEntryWidget)
         self.chatEntries.append(chatEntryWidget)
-        self.connect(chatEntryWidget, SIGNAL("mark_system"), self.markSystemOnMap)
+        self.connect(chatEntryWidget, SIGNAL("mark_system"), self.markSystemOnMapOrzKillBoardCheck)
         self.emit(SIGNAL("chat_message_added"), chatEntryWidget, timeA)
         self.pruneMessages()
         if scrollToBottom:
@@ -776,15 +814,15 @@ class MainWindow(QtGui.QMainWindow):
 
     def showInfo(self):
         infoDialog = QtGui.QDialog(self)
-        uic.loadUi(resourcePath("vi/ui/Info.ui"), infoDialog)
+        uic.loadUi(resourcePath("src/vi/ui/Info.ui"), infoDialog)
         infoDialog.versionLabel.setText(u"Version: {0}".format(vi.version.VERSION))
-        infoDialog.logoLabel.setPixmap(QtGui.QPixmap(resourcePath("vi/ui/res/logo.png")))
+        infoDialog.logoLabel.setPixmap(QtGui.QPixmap(resourcePath("src/vi/ui/res/logo.png")))
         infoDialog.connect(infoDialog.closeButton, SIGNAL("clicked()"), infoDialog.accept)
         infoDialog.show()
 
     def showSoundSetup(self):
         dialog = QtGui.QDialog(self)
-        uic.loadUi(resourcePath("vi/ui/SoundSetup.ui"), dialog)
+        uic.loadUi(resourcePath("src/vi/ui/SoundSetup.ui"), dialog)
         dialog.volumeSlider.setValue(SoundManager().soundVolume)
         dialog.connect(dialog.volumeSlider, SIGNAL("valueChanged(int)"), SoundManager().setSoundVolume)
         dialog.connect(dialog.testSoundButton, SIGNAL("clicked()"), SoundManager().playSound)
@@ -831,6 +869,8 @@ class MainWindow(QtGui.QMainWindow):
 
     def logFileChanged(self, path, rescan=False):
         messages = self.chatparser.fileModified(path, rescan)
+        print('messages: ')
+        print(messages)
         for message in messages:
             # If players location has changed
             if message.status == states.LOCATION:
@@ -869,7 +909,7 @@ class MainWindow(QtGui.QMainWindow):
 class ChatroomsChooser(QtGui.QDialog):
     def __init__(self, parent):
         QtGui.QDialog.__init__(self, parent)
-        uic.loadUi(resourcePath("vi/ui/ChatroomsChooser.ui"), self)
+        uic.loadUi(resourcePath("src/vi/ui/ChatroomsChooser.ui"), self)
         self.connect(self.defaultButton, SIGNAL("clicked()"), self.setDefaults)
         self.connect(self.cancelButton, SIGNAL("clicked()"), self.accept)
         self.connect(self.saveButton, SIGNAL("clicked()"), self.saveClicked)
@@ -892,7 +932,7 @@ class ChatroomsChooser(QtGui.QDialog):
 class RegionChooser(QtGui.QDialog):
     def __init__(self, parent):
         QtGui.QDialog.__init__(self, parent)
-        uic.loadUi(resourcePath("vi/ui/RegionChooser.ui"), self)
+        uic.loadUi(resourcePath("src/vi/ui/RegionChooser.ui"), self)
         self.connect(self.cancelButton, SIGNAL("clicked()"), self.accept)
         self.connect(self.saveButton, SIGNAL("clicked()"), self.saveClicked)
         cache = Cache()
@@ -913,7 +953,7 @@ class RegionChooser(QtGui.QDialog):
                 correct = False
                 # Fallback -> ships vintel with this map?
                 try:
-                    with open(resourcePath("vi/ui/res/mapdata/{0}.svg".format(text))) as _:
+                    with open(resourcePath("src/vi/ui/res/mapdata/{0}.svg".format(text))) as _:
                         correct = True
                 except Exception as e:
                     logging.error(e)
@@ -937,7 +977,7 @@ class SystemChat(QtGui.QDialog):
 
     def __init__(self, parent, chatType, selector, chatEntries, knownPlayerNames):
         QtGui.QDialog.__init__(self, parent)
-        uic.loadUi(resourcePath("vi/ui/SystemChat.ui"), self)
+        uic.loadUi(resourcePath("src/vi/ui/SystemChat.ui"), self)
         self.parent = parent
         self.chatType = 0
         self.selector = selector
@@ -967,14 +1007,50 @@ class SystemChat(QtGui.QDialog):
         self.chat.addItem(listWidgetItem)
         self.chat.setItemWidget(listWidgetItem, entry)
         self.chatEntries.append(entry)
-        self.connect(entry, SIGNAL("mark_system"), self.parent.markSystemOnMap)
+        self.connect(entry, SIGNAL("mark_system"), self.parent.markSystemOnMapOrzKillBoardCheck)
         if scrollToBottom:
             self.chat.scrollToBottom()
 
+    def formatBadGuy(self, bad_guy):
+        def formatSystem(text, word, system):
+                newText = u"""<a style="color:#CCAA00;font-weight:bold" href="mark_system/{0}">{1}</a>"""
+                text = text.replace(word, newText.format(system, word))
+                return text
+        bad_guy = bad_guy.lstrip(' ')
+        bad_guy = bad_guy.rstrip(' ')
+        bad_guy_formatted = formatSystem(bad_guy, bad_guy, bad_guy)
+        return ' ' + bad_guy_formatted
+        
     def addChatEntry(self, entry):
         if self.chatType == SystemChat.SYSTEM:
             message = entry.message
-            avatarPixmap = entry.avatarLabel.pixmap()
+            print 'addChatEntry: ' + message.plainText
+            system_name = 'none'
+            for system in message.systems:
+                 system_name = system.name
+            bad_guy = message.plainText.replace(system_name, '')
+            # we've just removed the system from the input string so let's check if there is only a single bad guy
+            # or if there are more
+            if '\\' in bad_guy:
+                list_of_bad_guys = bad_guy.split('\\')
+                list_of_bad_guys.pop() # anything past the final '\' should be comments about the situation, don't try to format it
+                for bad_guy in list_of_bad_guys:
+                    if bad_guy == ' ':
+                        continue
+                    bad_guy_formatted = self.formatBadGuy(bad_guy)
+
+                    if bad_guy_formatted in message.message:
+                        continue
+                    else:
+                        message.message = message.message.replace(bad_guy, bad_guy_formatted)
+            else:
+                bad_guy_formatted =  self.formatBadGuy(bad_guy)
+                if bad_guy_formatted in message.message:
+                    pass
+                else:
+                    message.message = message.message.replace(bad_guy, bad_guy_formatted)
+                
+            avatarPixmap = entry.avatarLabel.pixmap()     
             if self.selector in message.systems:
                 self._addMessageToChat(message, avatarPixmap)
 
@@ -1007,8 +1083,8 @@ class ChatEntryWidget(QtGui.QWidget):
     def __init__(self, message):
         QtGui.QWidget.__init__(self)
         if not self.questionMarkPixmap:
-            self.questionMarkPixmap = QtGui.QPixmap(resourcePath("vi/ui/res/qmark.png")).scaledToHeight(32)
-        uic.loadUi(resourcePath("vi/ui/ChatEntry.ui"), self)
+            self.questionMarkPixmap = QtGui.QPixmap(resourcePath("src/vi/ui/res/qmark.png")).scaledToHeight(32)
+        uic.loadUi(resourcePath("src/vi/ui/ChatEntry.ui"), self)
         self.avatarLabel.setPixmap(self.questionMarkPixmap)
         self.message = message
         self.updateText()
@@ -1021,6 +1097,7 @@ class ChatEntryWidget(QtGui.QWidget):
 
     def linkClicked(self, link):
         link = six.text_type(link)
+        print 'linkClicked activated: ' + link
         function, parameter = link.split("/", 1)
         if function == "mark_system":
             self.emit(SIGNAL("mark_system"), parameter)
@@ -1058,7 +1135,7 @@ class ChatEntryWidget(QtGui.QWidget):
 class JumpbridgeChooser(QtGui.QDialog):
     def __init__(self, parent, url):
         QtGui.QDialog.__init__(self, parent)
-        uic.loadUi(resourcePath("vi/ui/JumpbridgeChooser.ui"), self)
+        uic.loadUi(resourcePath("src/vi/ui/JumpbridgeChooser.ui"), self)
         self.connect(self.saveButton, SIGNAL("clicked()"), self.savePath)
         self.connect(self.cancelButton, SIGNAL("clicked()"), self.accept)
         self.connect(self.fileChooser, SIGNAL("clicked()"), self.choosePath)
